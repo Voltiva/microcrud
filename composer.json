@@ -61,7 +61,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Usoft\\Ufit\\UfitServiceProvider"
+                "Microcrud\\MicrocrudServiceProvider"
             ]
         }
     }
