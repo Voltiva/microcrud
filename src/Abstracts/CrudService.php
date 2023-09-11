@@ -6,7 +6,7 @@ namespace Microcrud\Abstracts;
 
 class CrudService extends Service
 {
-    public Model $model;
+    public $model;
     protected array $data;
     protected $private_key_name = 'id';
 

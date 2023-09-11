@@ -9,7 +9,6 @@ use Microcrud\Abstracts\Exceptions\NotFoundException;
 use Microcrud\Abstracts\Exceptions\UpdateException;
 use Microcrud\Abstracts\Exceptions\ValidationException;
 use Microcrud\Abstracts\Http\ApiBaseController;
-use Microcrud\Abstracts\Model;
 use Microcrud\Abstracts\Service;
 use Microcrud\Interfaces\CrudBaseController;
 
@@ -25,7 +24,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
     /**
      * Class constructor.
      */
-    public function __construct(Model $model, Service $service = null)
+    public function __construct($model, $service = null)
     {
         if ($service) {
             $this->service = new $service($model);

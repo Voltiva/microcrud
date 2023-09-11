@@ -2,13 +2,11 @@
 
 namespace Microcrud\Interfaces;
 
-use Microcrud\Abstracts\Model;
-
 interface ServiceInterface
 {
     public function setPrivateKeyName(string $private_key_name);
     public function get();
-    public function set(Model $model);
+    public function set($model);
     public function setById(array $data);
 
     public function getQuery($request);

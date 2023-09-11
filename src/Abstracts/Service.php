@@ -24,7 +24,7 @@ use Microcrud\Responses\ItemResource;
 
 abstract class Service implements ServiceInterface
 {
-    public Model $model;
+    public $model;
     protected array $data = [];
     protected $private_key_name = 'id';
 
@@ -36,7 +36,7 @@ abstract class Service implements ServiceInterface
     /**
      * Class constructor.
      */
-    public function __construct(Model $model, $resource = null, $client_resource = null)
+    public function __construct($model, $resource = null, $client_resource = null)
     {
         $this->model = $model;
         $this->resource = (isset($resource)) ? $resource : ItemResource::class;
@@ -74,7 +74,7 @@ abstract class Service implements ServiceInterface
     /**
      * @throws NotFoundException
      */
-    public function set(Model $model)
+    public function set($model)
     {
         if (isset($model)) {
             $this->model = $model;
