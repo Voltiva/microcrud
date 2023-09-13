@@ -32,8 +32,8 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             $itemsQuery = $this->service
                 ->setData($data)
                 ->getQuery();
-            if($trashed_status = $request->trashed_status && $this->service->is_soft_delete()){
-                switch ($trashed_status) {
+            if(array_key_exists('trashed_status', $data) && $this->service->is_soft_delete()){
+                switch ($data['trashed_status']) {
                     case -1:
                         $itemsQuery = $itemsQuery->onlyTrashed();
                         break;
