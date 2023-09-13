@@ -43,5 +43,5 @@ interface CrudBaseController
      * @param  \Illuminate\Http\Request  $request
      *
      */
-    function destroy(Request $request);
+    function delete(Request $request);
 }

@@ -11,6 +11,7 @@ use Microcrud\Abstracts\Exceptions\ValidationException;
 use Microcrud\Abstracts\Http\ApiBaseController;
 use Microcrud\Abstracts\Service;
 use Microcrud\Interfaces\CrudBaseController;
+use Microcrud\Responses\ItemResource;
 
 abstract class CrudController extends ApiBaseController implements CrudBaseController
 {
@@ -22,7 +23,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
     {
         $this->service = (isset($service))?new $service:new CrudService();
         $this->service->model = new $model;
-        $this->service->resource = (isset($resource)) ? $resource : ItemResource::class;
+        $this->service->setItemResource((isset($resource)) ? $resource : ItemResource::class);
     }
 
     public function index(Request $request)
