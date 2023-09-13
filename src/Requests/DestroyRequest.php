@@ -9,7 +9,8 @@ class DestroyRequest extends FormRequest
     public function validations()
     {
         return [
-            'id' => 'required|integer'
+            'id' => 'required|integer',
+            'is_force_destroy' => 'sometimes|boolean'
         ];
     }
 }

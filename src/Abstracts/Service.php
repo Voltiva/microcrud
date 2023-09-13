@@ -155,12 +155,11 @@ abstract class Service implements ServiceInterface
     {
         DB::beginTransaction();
         try {
-            if (empty($data)) {
-                $data = $this->getData();
-            } else {
+            if (!empty($data)) {
                 $this->setData($data);
             }
-            $this->beforeCreate();
+            $this->beforeCreate();            
+            $data = $this->getData();
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $model = $this->model::create($filtered_data);
@@ -202,12 +201,11 @@ abstract class Service implements ServiceInterface
     {
         DB::beginTransaction();
         try {
-            if (empty($data)) {
-                $data = $this->getData();
-            } else {
+            if (!empty($data)) {
                 $this->setData($data);
             }
-            $this->beforeUpdate();
+            $this->beforeUpdate();                        
+            $data = $this->getData();
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $this->get()->update($filtered_data);
@@ -247,7 +245,12 @@ abstract class Service implements ServiceInterface
     public function delete()
     {
         $this->beforeDelete();
-        $this->get()->delete();
+        $data = $this->getData();
+        if(array_key_exists('is_force_destroy', $data) && $data['is_force_destroy']){
+            $this->get()->forceDelete();
+        }else{
+            $this->get()->delete();
+        }
         $this->afterDelete();
         return $this;
     }
