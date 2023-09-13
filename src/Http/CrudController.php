@@ -16,21 +16,13 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
 {
     protected Service $service;
     /**
-     * Display a listing of the resource.
-     *
-     * @param \Illuminate\Http\Request  $request
-     *
-     */
-    /**
      * Class constructor.
      */
-    public function __construct($model, $service = null)
+    public function __construct($model, $service = null, $resource = null)
     {
-        if ($service) {
-            $this->service = new $service($model);
-        } else {
-            $this->service = new CrudService($model);
-        }
+        $this->service = (isset($service))?new $service:new CrudService();
+        $this->service->model = new $model;
+        $this->service->resource = (isset($resource)) ? $resource : ItemResource::class;
     }
 
     public function index(Request $request)

@@ -34,12 +34,11 @@ abstract class Service implements ServiceInterface
     /**
      * Class constructor.
      */
-    public function __construct($model, $resource = null)
+    public function __construct($model=null, $resource = null)
     {
         $this->model = $model;
         $this->resource = (isset($resource)) ? $resource : ItemResource::class;
     }
-
     public function setPrivateKeyName($private_key_name)
     {
         $this->private_key_name = $private_key_name;
@@ -204,7 +203,7 @@ abstract class Service implements ServiceInterface
 
     public function getItemResource()
     {
-        return $this->resource;
+        return (isset($this->resource)?$this->resource:ItemResource::class);
     }
     public function setItemResource($resource)
     {
