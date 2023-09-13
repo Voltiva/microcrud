@@ -19,7 +19,6 @@ use Microcrud\Requests\DestroyRequest;
 use Microcrud\Requests\PaginationRequest;
 use Microcrud\Requests\ShowRequest;
 use Illuminate\Support\Facades\Validator;
-use Microcrud\Responses\ClientItemResource;
 use Microcrud\Responses\ItemResource;
 
 abstract class Service implements ServiceInterface
@@ -32,15 +31,13 @@ abstract class Service implements ServiceInterface
 
     protected $query = null;
     protected $resource = null;
-    protected $client_resource = null;
     /**
      * Class constructor.
      */
-    public function __construct($model, $resource = null, $client_resource = null)
+    public function __construct($model, $resource = null)
     {
         $this->model = $model;
         $this->resource = (isset($resource)) ? $resource : ItemResource::class;
-        $this->client_resource = (isset($client_resource)) ? $client_resource : ClientItemResource::class;
     }
 
     public function setPrivateKeyName($private_key_name)
@@ -136,10 +133,86 @@ abstract class Service implements ServiceInterface
         }
         return $this;
     }
+    private function getRelationRule($key, $rule)
+    {
+        if (str_ends_with($key, '_id')) {
+            $relation_table = Str::plural(str_replace('_id', '', $key));
+            $relation = Str::camel(str_replace('_id', '', $key));
+            if (
+                method_exists($this->model, $relation)
+                && $this->model->{$relation}() instanceof \Illuminate\Database\Eloquent\Relations\Relation
+            ) {
+                $relation_model = (new $this->model)->{$relation}()->getRelated();
+                $tableName = $this->getModelTableName($relation_model);
+                $schema = $relation_model->getConnectionName();
+                $relation_keys = $this->getModelColumns($relation_model);
+                if (in_array($key, $relation_keys)) {
+                    $rule = $rule . "|exists:{$schema}.{$tableName},{$key}";
+                } else {
+                    $rule = $rule . "|exists:{$schema}.{$tableName},id";
+                }
+            } else if (Schema::hasTable($relation_table)) {
+                $rule = $rule . "|exists:{$relation_table},id";
+            }
+        }
+        return $rule;
+    }
+    /**
+     * @throws ValidationException
+     */
+    public function globalValidation($data, $rules = [])
+    {
+        if (count($rules)) {
+            $validator = Validator::make($data, $rules);
+            if ($validator->fails()) {
+                throw new ValidationException($validator->errors()->first(), 422);
+            }
+            $data = $validator->validated();
+        }
+        return $data;
+    }
+
+    public function withoutScopes(array $scopes = [])
+    {
+        $new_query = $this->getQuery();
+        if (count($scopes) > 0) {
+            foreach ($scopes as $scope) {
+                $new_query = $new_query->withoutGlobalScope($scope);
+            }
+        } else {
+            $new_query->withoutGlobalScopes();
+        }
+        $this->setQuery($new_query);
+        return $this;
+    }
+
+    public function getModelColumns($model = null)
+    {
+        if (!$model) {
+            $model = $this->model;
+        }
+        $keys = $model->getConnection()->getSchemaBuilder()->getColumnListing($this->getModelTableName($model));
+        return $keys;
+    }
+    public function getModelTableName($model = null)
+    {
+        if (!$model) {
+            $model = $this->model;
+        }
+        return $model->getTable();
+    }
+
+    public function getItemResource()
+    {
+        return $this->resource;
+    }
+    public function setItemResource($resource)
+    {
+        $this->resource = $resource;
+        return $this;
+    }
     public function beforeCreate()
     {
-        $rules = $this->model->create_rules;
-
         return $this;
     }
     public function createJob($data)
@@ -177,7 +250,6 @@ abstract class Service implements ServiceInterface
         $this->afterCreate();
         return $this;
     }
-
     public function afterCreate()
     {
         Cache::tags($this->getModelTableName())->flush();
@@ -187,7 +259,6 @@ abstract class Service implements ServiceInterface
     {
         return $this;
     }
-
     public function updateJob($data)
     {
         $this->is_job = true;
@@ -227,7 +298,6 @@ abstract class Service implements ServiceInterface
         Cache::tags($this->getModelTableName())->flush();
         return $this;
     }
-
     public function createOrUpdate($data)
     {
         if ($model = $this->model::where($this->private_key_name, $data[$this->private_key_name])->first()) {
@@ -241,7 +311,6 @@ abstract class Service implements ServiceInterface
     {
         return $this;
     }
-
     public function delete()
     {
         $this->beforeDelete();
@@ -259,30 +328,6 @@ abstract class Service implements ServiceInterface
         Cache::tags($this->getModelTableName())->flush();
         return $this;
     }
-
-    public function withoutScopes(array $scopes = [])
-    {
-        $new_query = $this->getQuery();
-        if (count($scopes) > 0) {
-            foreach ($scopes as $scope) {
-                $new_query = $new_query->withoutGlobalScope($scope);
-            }
-        } else {
-            $new_query->withoutGlobalScopes();
-        }
-        $this->setQuery($new_query);
-        return $this;
-    }
-
-    public function getModelColumns($model = null)
-    {
-        if (!$model) {
-            $model = $this->model;
-        }
-        $keys = $model->getConnection()->getSchemaBuilder()->getColumnListing($this->getModelTableName($model));
-        return $keys;
-    }
-
     public function indexRules($rules = [], $replace = false)
     {
         if ($replace) {
@@ -292,8 +337,6 @@ abstract class Service implements ServiceInterface
             return array_merge($model_rules, $rules);
         }
     }
-
-
     public function showRules($rules = [], $replace = false)
     {
         if ($replace) {
@@ -303,39 +346,7 @@ abstract class Service implements ServiceInterface
             return array_merge($model_rules, $rules);
         }
     }
-
-    public function findAllRules($rules = [], $replace = false)
-    {
-        if ($replace) {
-            return $rules;
-        } else {
-            $model_rules = (new PaginationRequest)->rules();
-            return array_merge($model_rules, $rules);
-        }
-    }
-
-
-    public function findOneRules($rules = [], $replace = false)
-    {
-        if ($replace) {
-            return $rules;
-        } else {
-            $model_rules = (new ShowRequest)->rules();
-            return array_merge($model_rules, $rules);
-        }
-    }
-
-    public function destroyRules($rules = [], $replace = false)
-    {
-        if ($replace) {
-            return $rules;
-        } else {
-            $model_rules = (new DestroyRequest)->rules();
-            return array_merge($model_rules, $rules);
-        }
-    }
-
-    public function storeRules($rules = [], $replace = false)
+    public function createRules($rules = [], $replace = false)
     {
         if ($replace) {
             return $rules;
@@ -361,7 +372,6 @@ abstract class Service implements ServiceInterface
             return array_merge($model_rules, $rules);
         }
     }
-
     public function updateRules($rules = [], $replace = false)
     {
         if ($replace) {
@@ -388,74 +398,13 @@ abstract class Service implements ServiceInterface
             return array_merge($model_rules, $rules);
         }
     }
-
-    private function getRelationRule($key, $rule)
+    public function deleteRules($rules = [], $replace = false)
     {
-        if (str_ends_with($key, '_id')) {
-            $relation_table = Str::plural(str_replace('_id', '', $key));
-            $relation = Str::camel(str_replace('_id', '', $key));
-            if (
-                method_exists($this->model, $relation)
-                && $this->model->{$relation}() instanceof \Illuminate\Database\Eloquent\Relations\Relation
-            ) {
-                $relation_model = (new $this->model)->{$relation}()->getRelated();
-                $tableName = $this->getModelTableName($relation_model);
-                $schema = $relation_model->getConnectionName();
-                $relation_keys = $this->getModelColumns($relation_model);
-                if (in_array($key, $relation_keys)) {
-                    $rule = $rule . "|exists:{$schema}.{$tableName},{$key}";
-                } else {
-                    $rule = $rule . "|exists:{$schema}.{$tableName},id";
-                }
-            } else if (Schema::hasTable($relation_table)) {
-                $rule = $rule . "|exists:{$relation_table},id";
-            }
+        if ($replace) {
+            return $rules;
+        } else {
+            $model_rules = (new DestroyRequest)->rules();
+            return array_merge($model_rules, $rules);
         }
-        return $rule;
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    public function globalValidation($data, $rules = [])
-    {
-        if (count($rules)) {
-            $validator = Validator::make($data, $rules);
-            if ($validator->fails()) {
-                throw new ValidationException($validator->errors()->first(), 422);
-            }
-            $data = $validator->validated();
-        }
-        return $data;
-    }
-
-    public function getItemResource()
-    {
-        return $this->resource;
-    }
-
-    public function getClientItemResource()
-    {
-        return $this->client_resource;
-    }
-
-    public function setItemResource($resource)
-    {
-        $this->resource = $resource;
-        return $this;
-    }
-
-    public function setClientItemResource($client_resource)
-    {
-        $this->client_resource = $client_resource;
-        return $this;
-    }
-
-    public function getModelTableName($model = null)
-    {
-        if (!$model) {
-            $model = $this->model;
-        }
-        return $model->getTable();
     }
 }

@@ -14,15 +14,15 @@ class StoreJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected array $data;
-    protected Service $service;
+    protected $data;
+    protected $service;
     /**
      * Create a new job instance.
      *
      * @param array $data
      * @return void
      */
-    public function __construct(array $data, Service $service)
+    public function __construct($data, $service)
     {
         $this->service = new $service;
         $this->data = $data;

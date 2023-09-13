@@ -3,9 +3,6 @@
 namespace Microcrud\Interfaces;
 
 use Illuminate\Http\Request;
-use Microcrud\Requests\DestroyRequest;
-use Microcrud\Requests\PaginationRequest;
-use Microcrud\Requests\ShowRequest;
 
 interface CrudBaseController
 {
@@ -30,7 +27,7 @@ interface CrudBaseController
      * @param  \Illuminate\Http\Request  $request
      *
      */
-    function store(Request $request);
+    function create(Request $request);
 
     /**
      * Update resource in storage.
@@ -47,21 +44,4 @@ interface CrudBaseController
      *
      */
     function destroy(Request $request);
-
-    //Controller for client API
-
-    /**
-     * Enlist all information.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     *
-     */
-    function findAll(Request $request);
-    /**
-     * Show one information
-     *
-     * @param  \Illuminate\Http\Request  $request
-     *
-     */
-    function findOne(Request $request);
 }
