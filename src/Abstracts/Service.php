@@ -20,6 +20,8 @@ use Microcrud\Requests\PaginationRequest;
 use Microcrud\Requests\ShowRequest;
 use Illuminate\Support\Facades\Validator;
 use Microcrud\Responses\ItemResource;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Microcrud\Requests\RestoreRequest;
 
 abstract class Service implements ServiceInterface
 {
@@ -201,6 +203,20 @@ abstract class Service implements ServiceInterface
         return $model->getTable();
     }
 
+    public function is_soft_delete(){
+        return in_array(SoftDeletes::class, array_keys((new \ReflectionClass($this->model))->getTraits()));
+        // $model = $this->model;
+        // $has_softdelete_trait = in_array(
+        //     SoftDeletes::class, 
+        //     array_keys((new \ReflectionClass($this->model))->getTraits())
+        // );
+        // $has_deleted_at = Schema::hasColumn($this->getModelTableName($model), 'column');
+        // if($has_softdelete_trait && $has_deleted_at){
+        //     return true;
+        // }
+        // return false;
+    }
+
     public function getItemResource()
     {
         return (isset($this->resource)?$this->resource:ItemResource::class);
@@ -314,7 +330,7 @@ abstract class Service implements ServiceInterface
     {
         $this->beforeDelete();
         $data = $this->getData();
-        if(array_key_exists('is_force_destroy', $data) && $data['is_force_destroy']){
+        if(array_key_exists('is_force_destroy', $data) && $data['is_force_destroy'] && $this->is_soft_delete()){
             $this->get()->forceDelete();
         }else{
             $this->get()->delete();
@@ -323,6 +339,24 @@ abstract class Service implements ServiceInterface
         return $this;
     }
     public function afterDelete()
+    {
+        Cache::tags($this->getModelTableName())->flush();
+        return $this;
+    }
+    public function beforeRestore()
+    {
+        return $this;
+    }
+    public function restore()
+    {
+        if($this->is_soft_delete()){
+            $this->beforeRestore();
+            $this->get()->restore();
+        }
+        $this->afterRestore();
+        return $this;
+    }
+    public function afterRestore()
     {
         Cache::tags($this->getModelTableName())->flush();
         return $this;
@@ -403,6 +437,16 @@ abstract class Service implements ServiceInterface
             return $rules;
         } else {
             $model_rules = (new DestroyRequest)->rules();
+            return array_merge($model_rules, $rules);
+        }
+    }
+
+    public function restoreRules($rules = [], $replace = false)
+    {
+        if ($replace) {
+            return $rules;
+        } else {
+            $model_rules = (new RestoreRequest)->rules();
             return array_merge($model_rules, $rules);
         }
     }

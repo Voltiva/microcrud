@@ -32,6 +32,18 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             $itemsQuery = $this->service
                 ->setData($data)
                 ->getQuery();
+            if($trashed_status = $request->trashed_status && $this->service->is_soft_delete()){
+                switch ($trashed_status) {
+                    case -1:
+                        $itemsQuery = $itemsQuery->onlyTrashed();
+                        break;
+                    case 1:
+                        $itemsQuery = $itemsQuery->withTrashed();
+                        break;
+                    default:
+                        break;
+                }
+            }
         } catch (ValidationException $th) {
             return $this->error($th->getMessage(), $th->getCode(), $th);
         } catch (\Exception $th) {
@@ -119,6 +131,10 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
     {
         try {
             $data = $this->service->globalValidation($request->all(), $this->service->deleteRules());
+            if($request->is_force_destroy){
+                $this->service
+                    ->setQuery($this->service->getQuery()->withTrashed());
+            }
             $this->service
                 ->setData($data)
                 ->setById()
@@ -131,5 +147,31 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             return $this->errorBadRequest($th->getMessage(), $th);
         }
         return $this->noContent();
+    }
+
+    /**
+     * Delete resource in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     *
+     */
+    public function restore(Request $request)
+    {
+        try {
+            $data = $this->service->globalValidation($request->all(), $this->service->restoreRules());
+            $item = $this->service
+                ->setQuery($this->service->getQuery()->withTrashed())
+                ->setData($data)
+                ->setById()
+                ->restore()
+                ->get();
+        } catch (ValidationException $th) {
+            return $this->error($th->getMessage(), $th->getCode(), $th);
+        } catch (NotFoundException $th) {
+            return $this->errorNotFound($th->getMessage(), $th);
+        } catch (\Exception $th) {
+            return $this->errorBadRequest($th->getMessage(), $th);
+        }
+        return $this->accepted($this->service->getItemResource(), $item);
     }
 }
