@@ -313,9 +313,9 @@ abstract class Service implements ServiceInterface
         Cache::tags($this->getModelTableName())->flush();
         return $this;
     }
-    public function createOrUpdate($data)
+    public function createOrUpdate($data, $conditions = [])
     {
-        if ($model = $this->model::where($this->private_key_name, $data[$this->private_key_name])->first()) {
+        if ($model = $this->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first()) {
             $this->set($model)->update($data);
         } else {
             $this->create($data);

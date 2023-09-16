@@ -7,6 +7,7 @@ use Microcrud\Services\Curl\Exceptions\CurlException;
 class CurlService
 {
     private $type;
+    private $status_code = 403;
     private $url;
     private $headers = [];
     private $params = [];
@@ -30,20 +31,27 @@ class CurlService
     protected function invokeCurlRequest($type, $url)
     {
         $ch = curl_init();
+        if(!empty($this->params)){
+            if ($type == self::POST) {
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($this->params));
+            }else{
+                $url= $url.'?'.http_build_query($this->params);
+            }
+        }
         curl_setopt($ch, CURLOPT_URL, $url);
         if (!empty($this->headers)) {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $this->headers);
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        if ($type == self::POST && !empty($this->params)) {
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($this->params));
-        }
+
         $response = curl_exec($ch);
         $err = curl_error($ch);
         curl_close($ch);
         if ($err) {
             throw new CurlException("Error: {$err}", 403);
+        }else{
+            $this->setStatusCode(curl_getinfo($ch, CURLINFO_HTTP_CODE));
         }
         $this->response = json_decode($response, true);
         return $this;
@@ -64,6 +72,17 @@ class CurlService
     protected function getParams()
     {
         return $this->params;
+    }
+
+    public function setStatusCode($status_code)
+    {
+        $this->status_code = $status_code;
+        return $this;
+    }
+
+    public function getStatusCode()
+    {
+        return $this->status_code;
     }
 
     public function getResponse($key = null)
