@@ -33,10 +33,11 @@ abstract class Service implements ServiceInterface
 
     protected $query = null;
     protected $resource = null;
+    protected $is_cacheable = true;
     /**
      * Class constructor.
      */
-    public function __construct($model=null, $resource = null)
+    public function __construct($model = null, $resource = null)
     {
         $this->model = $model;
         $this->resource = (isset($resource)) ? $resource : ItemResource::class;
@@ -44,6 +45,17 @@ abstract class Service implements ServiceInterface
     public function setPrivateKeyName($private_key_name)
     {
         $this->private_key_name = $private_key_name;
+        return $this;
+    }
+
+    public function getIsCacheable()
+    {
+        return $this->is_cacheable;
+    }
+
+    public function setIsCacheable($is_cacheable = true)
+    {
+        $this->is_cacheable = $is_cacheable;
         return $this;
     }
 
@@ -91,16 +103,20 @@ abstract class Service implements ServiceInterface
             $data = $this->getData();
         }
         if (array_key_exists($this->private_key_name, $data)) {
-            ksort($data);
-            $item_key = $this->getModelTableName() . ':' . serialize($data);
-            $model = Cache::tags([$this->getModelTableName()])
-                ->remember(
-                    $item_key,
-                    Carbon::now()->addDay(),
-                    function () use ($data) {
-                        return $this->withoutScopes()->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first();
-                    }
-                );
+            if ($this->getIsCacheable()) {
+                ksort($data);
+                $item_key = $this->getModelTableName() . ':' . serialize($data);
+                $model = Cache::tags([$this->getModelTableName()])
+                    ->remember(
+                        $item_key,
+                        Carbon::now()->addDay(),
+                        function () use ($data) {
+                            return $this->withoutScopes()->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first();
+                        }
+                    );
+            }else{
+                $model = $this->withoutScopes()->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first();
+            }
             if ($model) {
                 $this->set($model);
             } else {
@@ -203,7 +219,8 @@ abstract class Service implements ServiceInterface
         return $model->getTable();
     }
 
-    public function is_soft_delete(){
+    public function is_soft_delete()
+    {
         return in_array(SoftDeletes::class, array_keys((new \ReflectionClass($this->model))->getTraits()));
         // $model = $this->model;
         // $has_softdelete_trait = in_array(
@@ -219,7 +236,7 @@ abstract class Service implements ServiceInterface
 
     public function getItemResource()
     {
-        return (isset($this->resource)?$this->resource:ItemResource::class);
+        return (isset($this->resource) ? $this->resource : ItemResource::class);
     }
     public function setItemResource($resource)
     {
@@ -246,7 +263,7 @@ abstract class Service implements ServiceInterface
             if (!empty($data)) {
                 $this->setData($data);
             }
-            $this->beforeCreate();            
+            $this->beforeCreate();
             $data = $this->getData();
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
@@ -267,7 +284,9 @@ abstract class Service implements ServiceInterface
     }
     public function afterCreate()
     {
-        Cache::tags($this->getModelTableName())->flush();
+        if($this->getIsCacheable()){
+            Cache::tags($this->getModelTableName())->flush();
+        }
         return $this;
     }
     public function beforeUpdate()
@@ -290,7 +309,7 @@ abstract class Service implements ServiceInterface
             if (!empty($data)) {
                 $this->setData($data);
             }
-            $this->beforeUpdate();                        
+            $this->beforeUpdate();
             $data = $this->getData();
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
@@ -330,9 +349,9 @@ abstract class Service implements ServiceInterface
     {
         $this->beforeDelete();
         $data = $this->getData();
-        if(array_key_exists('is_force_destroy', $data) && $data['is_force_destroy'] && $this->is_soft_delete()){
+        if (array_key_exists('is_force_destroy', $data) && $data['is_force_destroy'] && $this->is_soft_delete()) {
             $this->get()->forceDelete();
-        }else{
+        } else {
             $this->get()->delete();
         }
         $this->afterDelete();
@@ -340,7 +359,9 @@ abstract class Service implements ServiceInterface
     }
     public function afterDelete()
     {
-        Cache::tags($this->getModelTableName())->flush();
+        if($this->getIsCacheable()){
+            Cache::tags($this->getModelTableName())->flush();
+        }
         return $this;
     }
     public function beforeRestore()
@@ -349,7 +370,7 @@ abstract class Service implements ServiceInterface
     }
     public function restore()
     {
-        if($this->is_soft_delete()){
+        if ($this->is_soft_delete()) {
             $this->beforeRestore();
             $this->get()->restore();
         }
@@ -358,7 +379,9 @@ abstract class Service implements ServiceInterface
     }
     public function afterRestore()
     {
-        Cache::tags($this->getModelTableName())->flush();
+        if($this->getIsCacheable()){
+            Cache::tags($this->getModelTableName())->flush();
+        }
         return $this;
     }
     public function indexRules($rules = [], $replace = false)

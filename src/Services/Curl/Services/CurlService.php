@@ -3,9 +3,11 @@
 namespace Microcrud\Services\Curl\Services;
 
 use Microcrud\Services\Curl\Exceptions\CurlException;
+use Illuminate\Support\Facades\Http;
 
 class CurlService
 {
+    private $requestType = 'Curl';
     private $type;
     private $status_code = 403;
     private $url;
@@ -28,15 +30,23 @@ class CurlService
         return $this->invokeCurlRequest(self::POST, $url);
     }
 
+    protected function invokeHttpRequest($type, $url)
+    {
+        if ($this->requestType === 'Http') {
+            return $this->invokeHttpClient($type, $url);
+        } else {
+            return $this->invokeCurlRequest($type, $url);
+        }
+    }
     protected function invokeCurlRequest($type, $url)
     {
         $ch = curl_init();
-        if(!empty($this->params)){
+        if (!empty($this->params)) {
             if ($type == self::POST) {
                 curl_setopt($ch, CURLOPT_POST, 1);
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($this->params));
-            }else{
-                $url= $url.'?'.http_build_query($this->params);
+            } else {
+                $url = $url . '?' . http_build_query($this->params);
             }
         }
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -50,10 +60,30 @@ class CurlService
         curl_close($ch);
         if ($err) {
             throw new CurlException("Error: {$err}", 403);
-        }else{
+        } else {
             $this->setStatusCode(curl_getinfo($ch, CURLINFO_HTTP_CODE));
         }
         $this->response = json_decode($response, true);
+        return $this;
+    }
+
+    protected function invokeHttpClient($type, $url)
+    {
+        try {
+            $response = null;
+            if ($type == self::POST) {
+                $response = Http::withHeaders($this->headers)->post($url, $this->params);
+            } else {
+                $response = Http::withHeaders($this->headers)->get($url, $this->params);
+            }
+            if ($response->successful()) {
+                $this->response = $response->json();
+            } else {
+                $this->setStatusCode($response->status());
+            }
+        } catch (\Exception $e) {
+            throw new CurlException("Error: {$e->getMessage()}", 403);
+        }
         return $this;
     }
 
@@ -97,20 +127,31 @@ class CurlService
         return $this->response;
     }
 
-    public function getUrl($key)
+    public function setRequestType($type)
     {
-        $base_user_url = env('BASE_USER_URL', '');
-        $base_notification_url = env('BASE_NOTIFICATION_URL', '');
-        $base_car_url = env('BASE_CAR_URL', '');
-        $base_payment_url = env('BASE_PAYMENT_URL', '');
+        $this->requestType = $type;
+        return $this;
+    }
 
+    public function getUrl($key, $replacements = [])
+    {
+        $base_car_info_url = env('BASE_CAR_INFO_URL', '');
+        $base_ocpp_url = env('OCPP_SERVICE_URL', '');
+        $payme_url = env('PAYME_SUBSCRIBE_URL', '');
         $urls = [
-
-            'user'=>$base_user_url.'',
-            'notification'=>$base_notification_url.'create',
-            'car'=>$base_car_url.'create',
-            'payment'=>$base_payment_url.'create',
+            'car_info' => $base_car_info_url,
+            'ocpp-start-charging' => $base_ocpp_url . 'charging-station/:id/remote-start-transaction',
+            'payme-subscribe' => $payme_url,
         ];
-        return $urls[$key];
+        if (!array_key_exists($key, $urls)) {
+            throw new \Exception("Url key not found!");
+        }
+        $url = $urls[$key];
+        if (count($replacements)) {
+            foreach ($replacements as $key => $value) {
+                $url = str_replace(':' . $key, $value, $url);
+            }
+        }
+        return $url;
     }
 }

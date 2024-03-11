@@ -9,7 +9,7 @@ class RestoreRequest extends FormRequest
     public function validations()
     {
         return [
-            'id' => 'required|integer',
+            'id' => 'required',
         ];
     }
 }

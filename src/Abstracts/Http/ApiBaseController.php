@@ -6,7 +6,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
-use stdClass;
 use Microcrud\Interfaces\ApiController;
 
 abstract class ApiBaseController implements ApiController
@@ -122,5 +121,12 @@ abstract class ApiBaseController implements ApiController
     public function translate(String $key)
     {
         return trans('microcrud_translations::' . $key);
+    }
+
+    public function get($data, $status_code = 200)
+    {
+        return response()->json([
+            'data' => $data
+        ], $status_code);
     }
 }
