@@ -43,8 +43,13 @@ class CurlService
         $ch = curl_init();
         if (!empty($this->params)) {
             if ($type == self::POST) {
+                $postData = json_encode($this->params);
                 curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($this->params));
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'Content-Type: application/json',
+                    'Content-Length: ' . strlen($postData)
+                ]);
             } else {
                 $url = $url . '?' . http_build_query($this->params);
             }
@@ -57,13 +62,16 @@ class CurlService
 
         $response = curl_exec($ch);
         $err = curl_error($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($err) {
-            throw new CurlException("Error: {$err}", 403);
-        } else {
-            $this->setStatusCode(curl_getinfo($ch, CURLINFO_HTTP_CODE));
+            throw new CurlException("cURL Error: {$err}", $statusCode);
         }
+        $this->setStatusCode($statusCode);
         $this->response = json_decode($response, true);
+        if ($this->response === null && json_last_error() !== JSON_ERROR_NONE) {
+            throw new CurlException("Invalid JSON response: " . json_last_error_msg(), $statusCode);
+        }
         return $this;
     }
 
