@@ -22,12 +22,12 @@ class CurlService
 
     public function get($url)
     {
-        return $this->invokeCurlRequest(self::GET, $url);
+        return $this->invokeHttpRequest(self::GET, $url);
     }
 
     public function post($url)
     {
-        return $this->invokeCurlRequest(self::POST, $url);
+        return $this->invokeHttpRequest(self::POST, $url);
     }
 
     protected function invokeHttpRequest($type, $url)
