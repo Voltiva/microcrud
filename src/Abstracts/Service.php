@@ -34,6 +34,9 @@ abstract class Service implements ServiceInterface
     protected $query = null;
     protected $resource = null;
     protected $is_cacheable = true;
+    protected $is_replace_rules = false;
+
+    protected array $rules = [];
     /**
      * Class constructor.
      */
@@ -70,7 +73,7 @@ abstract class Service implements ServiceInterface
         return $this->model;
     }
 
-    public function getQuery($request = null)
+    public function getQuery()
     {
         return ($this->query) ? $this->query : $this->model::query();
     }
@@ -78,6 +81,18 @@ abstract class Service implements ServiceInterface
     public function setQuery($query)
     {
         $this->query = $query;
+        return $this;
+    }
+    
+    public function getRules()
+    {
+        return $this->rules;
+    }
+
+    public function setRules($rules, $is_replace_rules = true)
+    {
+        $this->rules = $rules;
+        $this->is_replace_rules = $is_replace_rules;
         return $this;
     }
 
@@ -179,6 +194,14 @@ abstract class Service implements ServiceInterface
      */
     public function globalValidation($data, $rules = [])
     {
+        $custom_rules = $this->getRules();
+        if(!empty($custom_rules)){
+            if($this->is_replace_rules){
+                $rules = $custom_rules;
+            }else{
+                $rules = array_merge($custom_rules, $rules);
+            }
+        }
         if (count($rules)) {
             $validator = Validator::make($data, $rules);
             if ($validator->fails()) {

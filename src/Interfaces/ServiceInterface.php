@@ -9,7 +9,8 @@ interface ServiceInterface
     public function set($model);
     public function setById(array $data);
 
-    public function getQuery($request);
+    public function getQuery();
+    public function getRules();
 
     public function getData();
     public function setData(array $data);

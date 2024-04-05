@@ -42,20 +42,25 @@ abstract class ApiBaseController implements ApiController
         ], $status_code);
     }
 
-    protected function paginateQuery($resource, $modelQuery, $modelTableName = '', $status_code = 200)
+    protected function paginateQuery($resource, $modelQuery, $modelTableName = '', $status_code = 200, $is_cacheable = true)
     {
         $limit = request()->limit ?? 10;
         $data = request()->all();
-        ksort($data);
-        $item_key = request()->path() . ":" . $modelTableName . ":" . serialize($data);
-        $items = Cache::tags([$modelTableName])
-            ->remember(
-                $item_key,
-                Carbon::now()->addDay(),
-                function () use ($modelQuery, $limit) {
-                    return $modelQuery->paginate($limit);
-                }
-            );
+        
+        if($is_cacheable){
+            ksort($data);
+            $item_key = request()->path() . ":" . $modelTableName . ":" . serialize($data);
+            $items = Cache::tags([$modelTableName])
+                ->remember(
+                    $item_key,
+                    Carbon::now()->addDay(),
+                    function () use ($modelQuery, $limit) {
+                        return $modelQuery->paginate($limit);
+                    }
+                );
+        }else{
+            $items =  $modelQuery->paginate($limit);
+        }
         return response()->json([
             'pagination' => [
                 'current' => $items->currentPage(),
