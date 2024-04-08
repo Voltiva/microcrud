@@ -33,7 +33,7 @@ abstract class Service implements ServiceInterface
 
     protected $query = null;
     protected $resource = null;
-    protected $is_cacheable = true;
+    protected $is_cacheable = false;
     protected $is_replace_rules = false;
 
     protected array $rules = [];

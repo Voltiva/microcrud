@@ -42,7 +42,7 @@ abstract class ApiBaseController implements ApiController
         ], $status_code);
     }
 
-    protected function paginateQuery($resource, $modelQuery, $modelTableName = '', $status_code = 200, $is_cacheable = true)
+    protected function paginateQuery($resource, $modelQuery, $modelTableName = '', $status_code = 200, $is_cacheable = false)
     {
         $limit = request()->limit ?? 10;
         $data = request()->all();
