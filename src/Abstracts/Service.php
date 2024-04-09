@@ -2,26 +2,26 @@
 
 namespace Microcrud\Abstracts;
 
+use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Microcrud\Requests\ShowRequest;
+use Illuminate\Support\Facades\Cache;
+use Microcrud\Responses\ItemResource;
 use Illuminate\Support\Facades\Schema;
-use Microcrud\Abstracts\Exceptions\NotFoundException;
+use Microcrud\Abstracts\Jobs\StoreJob;
+use Microcrud\Requests\DestroyRequest;
+use Microcrud\Requests\RestoreRequest;
+use Microcrud\Abstracts\Jobs\UpdateJob;
+use Illuminate\Support\Facades\Validator;
+use Microcrud\Requests\PaginationRequest;
+use Microcrud\Interfaces\ServiceInterface;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Microcrud\Abstracts\Exceptions\CreateException;
 use Microcrud\Abstracts\Exceptions\UpdateException;
-use Microcrud\Abstracts\Jobs\StoreJob;
-use Microcrud\Abstracts\Jobs\UpdateJob;
-use Microcrud\Interfaces\ServiceInterface;
-use Illuminate\Support\Str;
+use Microcrud\Abstracts\Exceptions\NotFoundException;
 use Microcrud\Abstracts\Exceptions\ValidationException;
-use Microcrud\Requests\DestroyRequest;
-use Microcrud\Requests\PaginationRequest;
-use Microcrud\Requests\ShowRequest;
-use Illuminate\Support\Facades\Validator;
-use Microcrud\Responses\ItemResource;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Microcrud\Requests\RestoreRequest;
 
 abstract class Service implements ServiceInterface
 {
@@ -159,6 +159,8 @@ abstract class Service implements ServiceInterface
     public function setData(array $data)
     {
         if (isset($data)) {
+            Log::info("Data:");
+            Log::info($data);
             $this->data = $data;
         } else {
             throw new NotFoundException();
@@ -302,6 +304,8 @@ abstract class Service implements ServiceInterface
         }
         DB::commit();
         $this->set($model);
+        Log::info("Model created:");
+        Log::info($model);
         $this->afterCreate();
         return $this;
     }
