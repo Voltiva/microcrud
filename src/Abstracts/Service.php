@@ -89,7 +89,7 @@ abstract class Service implements ServiceInterface
         return $this->rules;
     }
 
-    public function setRules($rules, $is_replace_rules = true)
+    public function setRules($rules, $is_replace_rules = false)
     {
         $this->rules = $rules;
         $this->is_replace_rules = $is_replace_rules;
@@ -159,7 +159,7 @@ abstract class Service implements ServiceInterface
     public function setData(array $data)
     {
         if (isset($data)) {
-            Log::info("Data:");
+            Log::info("Set data:");
             Log::info($data);
             $this->data = $data;
         } else {

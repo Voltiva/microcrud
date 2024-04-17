@@ -3,6 +3,7 @@
 namespace Microcrud;
 
 use Illuminate\Support\ServiceProvider;
+use Microcrud\Middlewares\LogHttpRequest;
 use Microcrud\Middlewares\LocaleMiddleware;
 use Microcrud\Middlewares\TimezoneMiddleware;
 
@@ -71,6 +72,7 @@ class MicrocrudServiceProvider extends ServiceProvider
         //        $kernel->pushMiddleware('Yk\LaravelPackageExample\App\Http\Middleware\MiddlewareExample');
         $kernel->pushMiddleware(LocaleMiddleware::class);
         $kernel->pushMiddleware(TimezoneMiddleware::class);
+        $kernel->pushMiddleware(LogHttpRequest::class);
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'microcrud_translations');
         if ($this->app->runningInConsole()) {
             $this->publishes([
