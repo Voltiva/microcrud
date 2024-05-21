@@ -13,7 +13,7 @@ abstract class Enum
     public static function get($selection)
     {
         $result =  [];
-        if(in_array($selection, self::getAll())){
+        if(array_key_exists($selection, self::getAll())){
             $value = self::getSelections()[$selection];
             $result =  [
                 'key'=>$selection,
