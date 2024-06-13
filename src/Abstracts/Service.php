@@ -6,16 +6,12 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Microcrud\Requests\ShowRequest;
 use Illuminate\Support\Facades\Cache;
 use Microcrud\Responses\ItemResource;
 use Illuminate\Support\Facades\Schema;
 use Microcrud\Abstracts\Jobs\StoreJob;
-use Microcrud\Requests\DestroyRequest;
-use Microcrud\Requests\RestoreRequest;
 use Microcrud\Abstracts\Jobs\UpdateJob;
 use Illuminate\Support\Facades\Validator;
-use Microcrud\Requests\PaginationRequest;
 use Microcrud\Interfaces\ServiceInterface;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Microcrud\Abstracts\Exceptions\CreateException;
@@ -34,6 +30,9 @@ abstract class Service implements ServiceInterface
     protected $query = null;
     protected $resource = null;
     protected $is_cacheable = false;
+    protected $is_transaction_enabled = true;
+    protected $is_paginated = true;
+    protected $cache_expires_at = null;
     protected $is_replace_rules = false;
 
     protected array $rules = [];
@@ -43,12 +42,18 @@ abstract class Service implements ServiceInterface
     public function __construct($model = null, $resource = null)
     {
         $this->model = $model;
+        $this->cache_expires_at = Carbon::now()->addDay();
         $this->resource = (isset($resource)) ? $resource : ItemResource::class;
     }
     public function setPrivateKeyName($private_key_name)
     {
         $this->private_key_name = $private_key_name;
         return $this;
+    }
+
+    public function getPrivateKeyName()
+    {
+        return $this->private_key_name;
     }
 
     public function getIsCacheable()
@@ -59,6 +64,39 @@ abstract class Service implements ServiceInterface
     public function setIsCacheable($is_cacheable = true)
     {
         $this->is_cacheable = $is_cacheable;
+        return $this;
+    }
+
+    public function getIsTransactionEnabled()
+    {
+        return $this->is_transaction_enabled;
+    }
+
+    public function setIsTransactionEnabled($is_transaction_enabled = true)
+    {
+        $this->is_transaction_enabled = $is_transaction_enabled;
+        return $this;
+    }
+    public function getIsPaginated()
+    {
+        return $this->is_paginated;
+    }
+
+    public function setIsPaginated($is_paginated = true)
+    {
+        $this->is_paginated = $is_paginated;
+        return $this;
+    }
+
+
+    public function getCacheExpiresAt()
+    {
+        return $this->cache_expires_at;
+    }
+
+    public function setCacheExpiresAt($time)
+    {
+        $this->cache_expires_at = $time;
         return $this;
     }
 
@@ -83,7 +121,6 @@ abstract class Service implements ServiceInterface
         $this->query = $query;
         return $this;
     }
-    
     public function getRules()
     {
         return $this->rules;
@@ -117,28 +154,28 @@ abstract class Service implements ServiceInterface
         if (empty($data)) {
             $data = $this->getData();
         }
-        if (array_key_exists($this->private_key_name, $data)) {
+        if (array_key_exists($this->getPrivateKeyName(), $data)) {
             if ($this->getIsCacheable()) {
                 ksort($data);
                 $item_key = $this->getModelTableName() . ':' . serialize($data);
                 $model = Cache::tags([$this->getModelTableName()])
                     ->remember(
                         $item_key,
-                        Carbon::now()->addDay(),
+                        $this->getCacheExpiresAt(),
                         function () use ($data) {
-                            return $this->withoutScopes()->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first();
+                            return $this->withoutScopes()->getQuery()->where($this->getPrivateKeyName(), $data[$this->getPrivateKeyName()])->first();
                         }
                     );
-            }else{
-                $model = $this->withoutScopes()->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first();
+            } else {
+                $model = $this->withoutScopes()->getQuery()->where($this->getPrivateKeyName(), $data[$this->getPrivateKeyName()])->first();
             }
             if ($model) {
                 $this->set($model);
             } else {
-                throw new NotFoundException('Not found with id:' . $data[$this->private_key_name]);
+                throw new NotFoundException("Not found with {$this->getPrivateKeyName()}:" . $data[$this->getPrivateKeyName()]);
             }
         } else {
-            throw new NotFoundException('Request key not found with name:' . $this->private_key_name);
+            throw new NotFoundException('Request key not found with name:' . $this->getPrivateKeyName());
         }
         return $this;
     }
@@ -169,24 +206,27 @@ abstract class Service implements ServiceInterface
     }
     private function getRelationRule($key, $rule)
     {
-        if (str_ends_with($key, '_id')) {
-            $relation_table = Str::plural(str_replace('_id', '', $key));
-            $relation = Str::camel(str_replace('_id', '', $key));
-            if (
-                method_exists($this->model, $relation)
-                && $this->model->{$relation}() instanceof \Illuminate\Database\Eloquent\Relations\Relation
-            ) {
-                $relation_model = (new $this->model)->{$relation}()->getRelated();
-                $tableName = $this->getModelTableName($relation_model);
-                $schema = $relation_model->getConnectionName();
-                $relation_keys = $this->getModelColumns($relation_model);
-                if (in_array($key, $relation_keys)) {
-                    $rule = $rule . "|exists:{$schema}.{$tableName},{$key}";
-                } else {
-                    $rule = $rule . "|exists:{$schema}.{$tableName},id";
+        $relation_key_types = ['id', 'uuid'];
+        foreach ($relation_key_types as $relation_key_type) {
+            if (str_ends_with($key, '_' . $relation_key_type)) {
+                $relation_table = Str::plural(str_replace('_' . $relation_key_type, '', $key));
+                $relation = Str::camel(str_replace('_' . $relation_key_type, '', $key));
+                if (
+                    method_exists($this->model, $relation)
+                    && $this->model->{$relation}() instanceof \Illuminate\Database\Eloquent\Relations\Relation
+                ) {
+                    $relation_model = (new $this->model)->{$relation}()->getRelated();
+                    $tableName = $this->getModelTableName($relation_model);
+                    $schema = $relation_model->getConnectionName();
+                    $relation_keys = $this->getModelColumns($relation_model);
+                    if (in_array($key, $relation_keys)) {
+                        $rule = $rule . "|exists:{$schema}.{$tableName},{$key}";
+                    } else {
+                        $rule = $rule . "|exists:{$schema}.{$tableName},{$relation_key_type}";
+                    }
+                } else if (Schema::hasTable($relation_table)) {
+                    $rule = $rule . "|exists:{$relation_table},{$relation_key_type}";
                 }
-            } else if (Schema::hasTable($relation_table)) {
-                $rule = $rule . "|exists:{$relation_table},id";
             }
         }
         return $rule;
@@ -197,10 +237,10 @@ abstract class Service implements ServiceInterface
     public function globalValidation($data, $rules = [])
     {
         $custom_rules = $this->getRules();
-        if(!empty($custom_rules)){
-            if($this->is_replace_rules){
+        if (!empty($custom_rules)) {
+            if ($this->is_replace_rules) {
                 $rules = $custom_rules;
-            }else{
+            } else {
                 $rules = array_merge($custom_rules, $rules);
             }
         }
@@ -247,16 +287,6 @@ abstract class Service implements ServiceInterface
     public function is_soft_delete()
     {
         return in_array(SoftDeletes::class, array_keys((new \ReflectionClass($this->model))->getTraits()));
-        // $model = $this->model;
-        // $has_softdelete_trait = in_array(
-        //     SoftDeletes::class, 
-        //     array_keys((new \ReflectionClass($this->model))->getTraits())
-        // );
-        // $has_deleted_at = Schema::hasColumn($this->getModelTableName($model), 'column');
-        // if($has_softdelete_trait && $has_deleted_at){
-        //     return true;
-        // }
-        // return false;
     }
 
     public function getItemResource()
@@ -266,6 +296,56 @@ abstract class Service implements ServiceInterface
     public function setItemResource($resource)
     {
         $this->resource = $resource;
+        return $this;
+    }
+    public function beforeIndex()
+    {
+        return $this;
+    }
+    public function getAll()
+    {
+        return $this->getQuery()->get();
+    }
+
+    public function getPaginated($modelQuery = null, $modelTableName = null, $is_cacheable = false)
+    {   
+        $data = request()->all();
+        if(!isset(request()->page)){
+            request()->merge([
+                'page'=> 1
+            ]);
+        }
+        if(!isset(request()->limit)){
+            request()->merge([
+                'limit'=> 10
+            ]);
+        }
+        if(!$modelQuery){
+            $modelQuery = $this->getQuery();
+        }
+
+        if(!$modelTableName){
+            $modelTableName = $this->getModelTableName();
+        }
+        $limit = request()->limit ?? 10;
+        if($this->getIsCacheable()){
+            ksort($data);
+            $item_key = request()->path() . ":" . $modelTableName . ":" . serialize($data);
+            $items = Cache::tags([$modelTableName])
+                ->remember(
+                    $item_key,
+                    $this->getCacheExpiresAt(),
+                    function () use ($modelQuery, $limit) {
+                        return $modelQuery->paginate($limit);
+                    }
+                );
+        }else{
+            $items =  $modelQuery->paginate($limit);
+        }
+        return $items;
+    }
+    public function beforeShow()
+    {
         return $this;
     }
     public function beforeCreate()
@@ -283,7 +363,8 @@ abstract class Service implements ServiceInterface
      */
     public function create($data = [])
     {
-        DB::beginTransaction();
+        if ($this->getIsTransactionEnabled())
+            DB::beginTransaction();
         try {
             if (!empty($data)) {
                 $this->setData($data);
@@ -294,7 +375,8 @@ abstract class Service implements ServiceInterface
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $model = $this->model::create($filtered_data);
         } catch (\Exception $exception) {
-            DB::rollBack();
+            if ($this->getIsTransactionEnabled())
+                DB::rollBack();
             $message = "Cannot create. ERROR:{$exception->getMessage()}. TRACE: {$exception->getTraceAsString()}";
             if ($this->is_job) {
                 Log::error($message);
@@ -302,7 +384,8 @@ abstract class Service implements ServiceInterface
                 throw new CreateException($message);
             }
         }
-        DB::commit();
+        if ($this->getIsTransactionEnabled())
+            DB::commit();
         $this->set($model);
         Log::info("Model created:");
         Log::info($model);
@@ -311,7 +394,7 @@ abstract class Service implements ServiceInterface
     }
     public function afterCreate()
     {
-        if($this->getIsCacheable()){
+        if ($this->getIsCacheable()) {
             Cache::tags($this->getModelTableName())->flush();
         }
         return $this;
@@ -331,7 +414,8 @@ abstract class Service implements ServiceInterface
      */
     public function update($data = [])
     {
-        DB::beginTransaction();
+        if ($this->getIsTransactionEnabled())
+            DB::beginTransaction();
         try {
             if (!empty($data)) {
                 $this->setData($data);
@@ -342,7 +426,8 @@ abstract class Service implements ServiceInterface
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $this->get()->update($filtered_data);
         } catch (\Exception $exception) {
-            DB::rollBack();
+            if ($this->getIsTransactionEnabled())
+                DB::rollBack();
             $message = "Cannot update. ERROR:{$exception->getMessage()}. TRACE: {$exception->getTraceAsString()}";
             if ($this->is_job) {
                 Log::error($message);
@@ -350,22 +435,27 @@ abstract class Service implements ServiceInterface
                 throw new UpdateException($message);
             }
         }
-        DB::commit();
+        if ($this->getIsTransactionEnabled())
+            DB::commit();
         $this->afterUpdate();
         return $this;
     }
     public function afterUpdate()
     {
-        Cache::tags($this->getModelTableName())->flush();
+        if ($this->getIsCacheable()) {
+            Cache::tags($this->getModelTableName())->flush();
+        }
         return $this;
     }
     public function createOrUpdate($data, $conditions = [])
     {
-        if ($model = $this->getQuery()->where($this->private_key_name, $data[$this->private_key_name])->first()) {
-            $this->set($model)->update($data);
-        } else {
-            $this->create($data);
+        if (array_key_exists($this->getPrivateKeyName(), $data)) {
+            if ($model = $this->getQuery()->where($this->getPrivateKeyName(), $data[$this->getPrivateKeyName()])->first()) {
+                $this->set($model)->update($data);
+                return $this;
+            }
         }
+        $this->create($data);
         return $this;
     }
     public function beforeDelete()
@@ -386,7 +476,7 @@ abstract class Service implements ServiceInterface
     }
     public function afterDelete()
     {
-        if($this->getIsCacheable()){
+        if ($this->getIsCacheable()) {
             Cache::tags($this->getModelTableName())->flush();
         }
         return $this;
@@ -406,7 +496,7 @@ abstract class Service implements ServiceInterface
     }
     public function afterRestore()
     {
-        if($this->getIsCacheable()){
+        if ($this->getIsCacheable()) {
             Cache::tags($this->getModelTableName())->flush();
         }
         return $this;
@@ -416,8 +506,17 @@ abstract class Service implements ServiceInterface
         if ($replace) {
             return $rules;
         } else {
-            $model_rules = (new PaginationRequest)->rules();
-            return array_merge($model_rules, $rules);
+            $rules = array_merge([
+                'trashed_status' => 'sometimes|integer|in:-1,0,1'
+            ], $rules);
+            if ($this->getIsPaginated()) {
+                return array_merge([
+                    'page' => 'sometimes|numeric|min:1',
+                    'limit' => 'sometimes|numeric|min:1',
+                ], $rules);
+            } else {
+                return $rules;
+            }
         }
     }
     public function showRules($rules = [], $replace = false)
@@ -425,8 +524,7 @@ abstract class Service implements ServiceInterface
         if ($replace) {
             return $rules;
         } else {
-            $model_rules = (new ShowRequest)->rules();
-            return array_merge($model_rules, $rules);
+            return array_merge($this->getIdRule(), $rules);
         }
     }
     public function createRules($rules = [], $replace = false)
@@ -437,7 +535,7 @@ abstract class Service implements ServiceInterface
             $keys = $this->getModelColumns();
             $model_rules = [];
             $required_fields = [];
-            $exceptional_fields = ['id', 'updated_at', 'created_at', 'deleted_at'];
+            $exceptional_fields = [$this->getPrivateKeyName(), 'updated_at', 'created_at', 'deleted_at'];
             foreach ($keys as $key) {
                 // $type = Schema::getColumnType($table, $key);
                 // $model_rules[$key]='required|'.$type;
@@ -462,18 +560,19 @@ abstract class Service implements ServiceInterface
         } else {
             $keys = $this->getModelColumns();
             $model_rules = [];
-            $required_fields = ['id'];
+            $required_fields = [$this->getPrivateKeyName()];
             $exceptional_fields = ['updated_at', 'created_at', 'deleted_at'];
             foreach ($keys as $key) {
                 // $type = Schema::getColumnType($table, $key);
                 // $model_rules[$key]='required|'.$type;
                 if (in_array($key, $exceptional_fields)) {
-                    //skip
                     continue;
                 }
                 $rule = 'sometimes';
                 if (in_array($key, $required_fields)) {
-                    $rule = 'required';
+                    $tableName = $this->getModelTableName();
+                    $schema = $this->model->getConnectionName();
+                    $rule = "required|exists:{$schema}.{$tableName},{$key}";
                 }
                 $rule = $this->getRelationRule($key, $rule);
                 $model_rules[$key] = $rule;
@@ -486,7 +585,9 @@ abstract class Service implements ServiceInterface
         if ($replace) {
             return $rules;
         } else {
-            $model_rules = (new DestroyRequest)->rules();
+            $model_rules = array_merge($this->getIdRule(), [
+                'is_force_destroy' => 'sometimes|boolean'
+            ]);
             return array_merge($model_rules, $rules);
         }
     }
@@ -496,8 +597,22 @@ abstract class Service implements ServiceInterface
         if ($replace) {
             return $rules;
         } else {
-            $model_rules = (new RestoreRequest)->rules();
-            return array_merge($model_rules, $rules);
+            return array_merge($this->getIdRule(), $rules);
         }
+    }
+
+    public function getIdRule($model = null, $key = null)
+    {
+        if (!$model) {
+            $model = $this->model;
+        }
+        if (!$key) {
+            $key = $this->getPrivateKeyName();
+        }
+        $tableName = $this->getModelTableName($model);
+        $schema = $model->getConnectionName();
+        return [
+            $key => "required|exists:{$schema}.{$tableName}," . $key
+        ];
     }
 }

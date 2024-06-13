@@ -2,14 +2,26 @@
 
 namespace Microcrud\Abstracts\Http;
 
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Lang;
+use Microcrud\Abstracts\Service;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Lang;
+use Microcrud\Abstracts\CrudService;
+use Microcrud\Responses\ItemResource;
 use Microcrud\Interfaces\ApiController;
 
 abstract class ApiBaseController implements ApiController
 {
+
+    protected Service $service;
+    /**
+     * Class constructor.
+     */
+    public function __construct($model, $service = null, $resource = null)
+    {
+        $this->service = (isset($service)) ? new $service : new CrudService();
+        $this->service->model = new $model;
+        $this->service->setItemResource((isset($resource)) ? $resource : ItemResource::class);
+    }
     public function created($resource, $item)
     {
         return $this->singleItem($resource, $item, 201);
@@ -42,36 +54,13 @@ abstract class ApiBaseController implements ApiController
         ], $status_code);
     }
 
-    protected function paginateQuery($resource, $modelQuery, $modelTableName = '', $status_code = 200, $is_cacheable = false)
+    protected function paginateQuery($resource=null, $modelQuery=null, $modelTableName = '', $status_code = 200, $is_cacheable = false)
     {
-        $limit = request()->limit ?? 10;
-        $data = request()->all();
-        
-        if($is_cacheable){
-            ksort($data);
-            $item_key = request()->path() . ":" . $modelTableName . ":" . serialize($data);
-            $items = Cache::tags([$modelTableName])
-                ->remember(
-                    $item_key,
-                    Carbon::now()->addDay(),
-                    function () use ($modelQuery, $limit) {
-                        return $modelQuery->paginate($limit);
-                    }
-                );
-        }else{
-            $items =  $modelQuery->paginate($limit);
+        $items = $this->service->getPaginated($modelQuery, $modelTableName, $is_cacheable = false);
+        if(!$resource){
+            $resource = $this->service->getItemResource();
         }
-        return response()->json([
-            'pagination' => [
-                'current' => $items->currentPage(),
-                'previous' => $items->currentPage() > 1 ? $items->currentPage() - 1 : 0,
-                'next' => $items->hasMorePages() ? $items->currentPage() + 1 : 0,
-                'perPage' => $items->perPage(),
-                'totalPage' => $items->lastPage(),
-                'totalItem' => $items->total(),
-            ],
-            'data' => $resource::collection($items->items())
-        ], $status_code);
+        return $this->paginated($resource, $items, $status_code);
     }
 
     public function success($message = 'Success', $status_code = 200)
@@ -79,6 +68,12 @@ abstract class ApiBaseController implements ApiController
         return response()->json([
             'message' => __($message)
         ], $status_code);
+    }
+
+
+    public function failure($message = 'Failed', $status_code = 400)
+    {
+        return $this->success($message, $status_code);
     }
 
     public function noContent()
@@ -133,5 +128,15 @@ abstract class ApiBaseController implements ApiController
         return response()->json([
             'data' => $data
         ], $status_code);
+    }
+    public function getResource($resource = null, $items = null, $status_code = 200)
+    {
+        if(!$resource){
+            $resource = $this->service->getItemResource();
+        }
+        if(!isset($items)){
+            $items = $this->service->getAll();
+        }
+        return $this->get($resource::collection($items), $status_code);
     }
 }

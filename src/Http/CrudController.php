@@ -3,27 +3,18 @@
 namespace Microcrud\Http;
 
 use Illuminate\Http\Request;
-use Microcrud\Abstracts\CrudService;
-use Microcrud\Abstracts\Exceptions\CreateException;
-use Microcrud\Abstracts\Exceptions\NotFoundException;
-use Microcrud\Abstracts\Exceptions\UpdateException;
-use Microcrud\Abstracts\Exceptions\ValidationException;
-use Microcrud\Abstracts\Http\ApiBaseController;
-use Microcrud\Abstracts\Service;
 use Microcrud\Interfaces\CrudBaseController;
-use Microcrud\Responses\ItemResource;
+use Microcrud\Abstracts\Http\ApiBaseController;
+use Microcrud\Abstracts\Exceptions\CreateException;
+use Microcrud\Abstracts\Exceptions\UpdateException;
+use Microcrud\Abstracts\Exceptions\NotFoundException;
+use Microcrud\Abstracts\Exceptions\ValidationException;
 
 abstract class CrudController extends ApiBaseController implements CrudBaseController
 {
-    protected Service $service;
-    /**
-     * Class constructor.
-     */
     public function __construct($model, $service = null, $resource = null)
     {
-        $this->service = (isset($service))?new $service:new CrudService();
-        $this->service->model = new $model;
-        $this->service->setItemResource((isset($resource)) ? $resource : ItemResource::class);
+        parent::__construct($model, $service, $resource);
     }
 
     public function index(Request $request)
@@ -32,6 +23,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             $data = $this->service->globalValidation($request->all(), $this->service->indexRules());
             $itemsQuery = $this->service
                 ->setData($data)
+                ->beforeIndex()
                 ->getQuery();
             if(array_key_exists('trashed_status', $data) && $this->service->is_soft_delete()){
                 switch ($data['trashed_status']) {
@@ -45,12 +37,17 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
                         break;
                 }
             }
+            $this->service->setQuery($itemsQuery);
         } catch (ValidationException $th) {
             return $this->error($th->getMessage(), $th->getCode(), $th);
         } catch (\Exception $th) {
             return $this->errorBadRequest($th->getMessage(), $th);
         }
-        return $this->paginateQuery($this->service->getItemResource(), $itemsQuery, $this->service->getModelTableName());
+        if($this->service->getIsPaginated()){
+            return $this->paginateQuery();
+        }else{
+            return $this->getResource();
+        }
     }
 
     public function show(Request $request)
@@ -59,6 +56,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             $data = $this->service->globalValidation($request->all(), $this->service->showRules());
             $item = $this->service
                 ->setData($data)
+                ->beforeShow()
                 ->setById()
                 ->get();
         } catch (ValidationException $th) {
