@@ -22,25 +22,37 @@ abstract class ApiBaseController implements ApiController
         $this->service->model = new $model;
         $this->service->setItemResource((isset($resource)) ? $resource : ItemResource::class);
     }
-    public function created($resource, $item)
+    public function created($resource = null, $item = null)
     {
+        if(!$resource){
+            $resource = $this->service->getItemResource();
+        }
         return $this->singleItem($resource, $item, 201);
     }
 
-    public function accepted($resource, $item)
+    public function accepted($resource = null, $item = null)
     {
+        if(!$resource){
+            $resource = $this->service->getItemResource();
+        }
         return $this->singleItem($resource, $item, 202);
     }
 
-    public function singleItem($resource, $item, $status_code = 200)
+    public function singleItem($resource = null, $item = null, $status_code = 200)
     {
+        if(!$resource){
+            $resource = $this->service->getItemResource();
+        }
         return response()->json([
             "data" => new $resource($item)
         ], $status_code);
     }
 
-    public function paginated($resource, $items, $status_code = 200)
+    public function paginated($resource = null, $items, $status_code = 200)
     {
+        if(!$resource){
+            $resource = $this->service->getItemResource();
+        }
         return response()->json([
             'pagination' => [
                 'current' => $items->currentPage(),
