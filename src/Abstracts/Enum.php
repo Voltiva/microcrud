@@ -1,24 +1,45 @@
 <?php
 
-namespace Voltiva\Common\Abstract;
+namespace Microcrud\Abstracts;
 
 abstract class Enum
 {
-    abstract public static function getAll();
-
-    public static function getSelections()
+    static function getAll()
     {
-        return self::getAll();
+        return [];
     }
-    public static function get($selection)
+    static function getSelections()
+    {
+        return [];
+    }
+    public static function get($selection = null, $types = [])
     {
         $result =  [];
-        if(array_key_exists($selection, self::getAll())){
-            $value = self::getSelections()[$selection];
+        $selections = static::getSelections();
+        if (empty($selections)) {
+            if (empty($types)) {
+                $types = static::getAll();
+            }
+            foreach ($types as $type) {
+                $selections[$type] = $type;
+            }
+        }
+        if (is_array($selections) && array_key_exists($selection, $selections)) {
             $result =  [
-                'key'=>$selection,
-                'value'=>$value
+                'key' => $selection,
+                'value' => $selections[$selection]
             ];
+        }
+        return $result;
+    }
+    public static function collectAll($types = [])
+    {
+        if (empty($types)) {
+            $types = static::getAll();
+        }
+        $result = [];
+        foreach ($types as $type) {
+            $result[] = static::get($type);
         }
         return $result;
     }
