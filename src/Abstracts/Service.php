@@ -302,6 +302,11 @@ abstract class Service implements ServiceInterface
     {
         return $this;
     }
+
+    public function afterIndex()
+    {
+        return $this;
+    }
     public function getAll()
     {
         return $this->getQuery()->get();
@@ -345,6 +350,11 @@ abstract class Service implements ServiceInterface
         return $items;
     }
     public function beforeShow()
+    {
+        return $this;
+    }
+
+    public function afterShow()
     {
         return $this;
     }

@@ -59,6 +59,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
                 ->setData($data)
                 ->beforeShow()
                 ->setById()
+                ->afterShow()
                 ->get();
         } catch (ValidationException $th) {
             return $this->error($th->getMessage(), $th->getCode(), $th);
