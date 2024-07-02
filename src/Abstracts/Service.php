@@ -36,6 +36,7 @@ abstract class Service implements ServiceInterface
     protected $is_replace_rules = false;
 
     protected array $rules = [];
+    protected $items = [];
     /**
      * Class constructor.
      */
@@ -204,6 +205,17 @@ abstract class Service implements ServiceInterface
         }
         return $this;
     }
+
+
+    public function getItems()
+    {
+        return $this->items;
+    }
+    public function setItems(array $items)
+    {
+        $this->items = $items;
+        return $this;
+    }
     private function getRelationRule($key, $rule)
     {
         $relation_key_types = ['id', 'uuid'];
@@ -309,7 +321,9 @@ abstract class Service implements ServiceInterface
     }
     public function getAll()
     {
-        return $this->getQuery()->get();
+        $items = $this->getQuery()->get();
+        $this->setItems($items)->afterIndex();
+        return $this->getItems();
     }
 
     public function getPaginated($modelQuery = null, $modelTableName = null, $is_cacheable = false)
@@ -347,7 +361,8 @@ abstract class Service implements ServiceInterface
         }else{
             $items =  $modelQuery->paginate($limit);
         }
-        return $items;
+        $this->setItems($items)->afterIndex();
+        return $this->getItems();
     }
     public function beforeShow()
     {
