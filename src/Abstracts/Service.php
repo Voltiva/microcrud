@@ -211,7 +211,7 @@ abstract class Service implements ServiceInterface
     {
         return $this->items;
     }
-    public function setItems(array $items)
+    public function setItems($items)
     {
         $this->items = $items;
         return $this;
