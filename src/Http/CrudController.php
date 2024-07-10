@@ -26,6 +26,9 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
                 ->setData($data)
                 ->beforeIndex()
                 ->getQuery();
+            if (array_key_exists('is_all', $data) && $data['is_all']) {
+                $this->service->setIsPaginated(false);
+            }
             if (array_key_exists('trashed_status', $data) && $this->service->is_soft_delete()) {
                 switch ($data['trashed_status']) {
                     case -1:
@@ -84,10 +87,17 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             DB::beginTransaction();
         try {
             $data = $this->service->globalValidation($request->all(), $this->service->createRules());
-            $item = $this->service
-                ->setData($data)
-                ->create()
-                ->get();
+            if (array_key_exists('is_job', $data) && $data['is_job']) {
+                $this->service
+                    ->setData($data)
+                    ->createJob();
+                return $this->success();
+            } else {
+                $item = $this->service
+                    ->setData($data)
+                    ->create()
+                    ->get();
+            }
         } catch (ValidationException $th) {
             if (!$this->service->getIsTransactionEnabled())
                 DB::rollBack();
@@ -119,11 +129,18 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             DB::beginTransaction();
         try {
             $data = $this->service->globalValidation($request->all(), $this->service->updateRules());
-            $item = $this->service
-                ->setData($data)
-                ->setById()
-                ->update()
-                ->get();
+            if (array_key_exists('is_job', $data) && $data['is_job']) {
+                $this->service
+                    ->setData($data)
+                    ->createJob();
+                return $this->success();
+            } else {
+                $item = $this->service
+                    ->setData($data)
+                    ->setById()
+                    ->update()
+                    ->get();
+            }
         } catch (ValidationException $th) {
             if (!$this->service->getIsTransactionEnabled())
                 DB::rollBack();

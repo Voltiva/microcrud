@@ -377,9 +377,12 @@ abstract class Service implements ServiceInterface
     {
         return $this;
     }
-    public function createJob($data)
+    public function createJob($data = [])
     {
         $this->is_job = true;
+        if (empty($data)) {
+            $data = $this->getData();
+        }
         StoreJob::dispatchSync($data, $this);
         return $this;
     }
@@ -428,9 +431,12 @@ abstract class Service implements ServiceInterface
     {
         return $this;
     }
-    public function updateJob($data)
+    public function updateJob($data = [])
     {
         $this->is_job = true;
+        if (empty($data)) {
+            $data = $this->getData();
+        }
         UpdateJob::dispatchSync($data, $this);
         return $this;
     }
@@ -450,6 +456,7 @@ abstract class Service implements ServiceInterface
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $this->get()->update($filtered_data);
+            $this->get()->refresh();
         } catch (\Exception $exception) {
             if ($this->getIsTransactionEnabled())
                 DB::rollBack();
@@ -472,8 +479,11 @@ abstract class Service implements ServiceInterface
         }
         return $this;
     }
-    public function createOrUpdate($data, $conditions = [])
+    public function createOrUpdate($data = [], $conditions = [])
     {
+        if (empty($data)) {
+            $data = $this->getData();
+        }
         if (array_key_exists($this->getPrivateKeyName(), $data)) {
             if ($model = $this->getQuery()->where($this->getPrivateKeyName(), $data[$this->getPrivateKeyName()])->first()) {
                 $this->set($model)->update($data);
@@ -532,7 +542,9 @@ abstract class Service implements ServiceInterface
             return $rules;
         } else {
             $rules = array_merge([
-                'trashed_status' => 'sometimes|integer|in:-1,0,1'
+                'trashed_status' => 'sometimes|integer|in:-1,0,1',
+                'is_all' => 'sometimes|boolean',
+                'search' => 'sometimes|string',
             ], $rules);
             if ($this->getIsPaginated()) {
                 return array_merge([
@@ -575,6 +587,7 @@ abstract class Service implements ServiceInterface
                 $rule = $this->getRelationRule($key, $rule);
                 $model_rules[$key] = $rule;
             }
+            $model_rules['is_job'] = 'sometimes|boolean';
             return array_merge($model_rules, $rules);
         }
     }
