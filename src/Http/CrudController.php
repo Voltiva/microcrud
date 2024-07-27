@@ -41,6 +41,9 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
                         break;
                 }
             }
+            if (array_key_exists('updated_at', $data) && $data['updated_at']) {
+                $itemsQuery = $itemsQuery->where('updated_at', '>=', $data['updated_at']);
+            }
             $this->service->setQuery($itemsQuery);
         } catch (ValidationException $th) {
             return $this->error($th->getMessage(), $th->getCode(), $th);
