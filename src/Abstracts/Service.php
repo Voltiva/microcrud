@@ -613,6 +613,7 @@ abstract class Service implements ServiceInterface
                     $schema = $this->model->getConnectionName();
                     $rule = "required|exists:{$schema}.{$tableName},{$key}";
                 }
+                $model_rules['is_job'] = 'sometimes|boolean';
                 $rule = $this->getRelationRule($key, $rule);
                 $model_rules[$key] = $rule;
             }

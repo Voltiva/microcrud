@@ -26,7 +26,7 @@ class LocaleMiddleware
                 App::setLocale($lang);
             }
         } else {
-            App::setLocale($request->getPreferredLanguage(config('app.locales')));
+            App::setLocale($request->getPreferredLanguage($locales));
         }
         return $next($request);
     }
