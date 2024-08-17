@@ -415,7 +415,7 @@ abstract class Service implements ServiceInterface
                 throw new CreateException($message);
             }
         }
-        if ($this->getIsTransactionEnabled())
+        if ($this->getIsTransactionEnabled() || $this->is_job)
             DB::commit();
         $this->afterCreate();
         return $this;
@@ -467,7 +467,7 @@ abstract class Service implements ServiceInterface
                 throw new UpdateException($message);
             }
         }
-        if ($this->getIsTransactionEnabled())
+        if ($this->getIsTransactionEnabled() || $this->is_job)
             DB::commit();
         $this->afterUpdate();
         return $this;
