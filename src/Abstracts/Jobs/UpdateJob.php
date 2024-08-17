@@ -3,12 +3,12 @@
 namespace Microcrud\Abstracts\Jobs;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Microcrud\Abstracts\Service;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Microcrud\Abstracts\Service;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 
 class UpdateJob implements ShouldQueue, ShouldBeUnique
 {
@@ -24,7 +24,7 @@ class UpdateJob implements ShouldQueue, ShouldBeUnique
      */
     public function __construct($data, $service)
     {
-        $this->service = new $service;
+        $this->service = $service;
         $this->data = $data;
     }
 
