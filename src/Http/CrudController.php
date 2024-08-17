@@ -135,6 +135,7 @@ abstract class CrudController extends ApiBaseController implements CrudBaseContr
             if (array_key_exists('is_job', $data) && $data['is_job']) {
                 $this->service
                     ->setData($data)
+                    ->setById()
                     ->createJob();
                 return $this->success();
             } else {

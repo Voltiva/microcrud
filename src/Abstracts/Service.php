@@ -402,6 +402,9 @@ abstract class Service implements ServiceInterface
             $keys = $this->getModelColumns();
             $filtered_data = array_intersect_key($data, array_flip($keys));
             $model = $this->model::create($filtered_data);
+            $this->set($model);
+            Log::info("Model created:");
+            Log::info($model);
         } catch (\Exception $exception) {
             if ($this->getIsTransactionEnabled())
                 DB::rollBack();
@@ -414,9 +417,6 @@ abstract class Service implements ServiceInterface
         }
         if ($this->getIsTransactionEnabled())
             DB::commit();
-        $this->set($model);
-        Log::info("Model created:");
-        Log::info($model);
         $this->afterCreate();
         return $this;
     }
@@ -613,10 +613,10 @@ abstract class Service implements ServiceInterface
                     $schema = $this->model->getConnectionName();
                     $rule = "required|exists:{$schema}.{$tableName},{$key}";
                 }
-                $model_rules['is_job'] = 'sometimes|boolean';
                 $rule = $this->getRelationRule($key, $rule);
                 $model_rules[$key] = $rule;
             }
+            $model_rules['is_job'] = 'sometimes|boolean';
             return array_merge($model_rules, $rules);
         }
     }
