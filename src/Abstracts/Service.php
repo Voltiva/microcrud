@@ -484,6 +484,12 @@ abstract class Service implements ServiceInterface
         if (empty($data)) {
             $data = $this->getData();
         }
+        if(count($conditions)){
+            if ($model = $this->getQuery()->where($conditions)->first()){
+                $this->set($model)->update($data);
+                return $this;
+            }
+        }
         if (array_key_exists($this->getPrivateKeyName(), $data)) {
             if ($model = $this->getQuery()->where($this->getPrivateKeyName(), $data[$this->getPrivateKeyName()])->first()) {
                 $this->set($model)->update($data);
