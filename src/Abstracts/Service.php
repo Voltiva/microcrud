@@ -383,7 +383,7 @@ abstract class Service implements ServiceInterface
         if (empty($data)) {
             $data = $this->getData();
         }
-        StoreJob::dispatchSync($data, $this);
+        StoreJob::dispatch($this);
         return $this;
     }
     /**
@@ -437,7 +437,7 @@ abstract class Service implements ServiceInterface
         if (empty($data)) {
             $data = $this->getData();
         }
-        UpdateJob::dispatchSync($data, $this);
+        UpdateJob::dispatch($this);
         return $this;
     }
     /**

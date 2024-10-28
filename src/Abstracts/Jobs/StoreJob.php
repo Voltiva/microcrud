@@ -22,10 +22,9 @@ class StoreJob implements ShouldQueue, ShouldBeUnique
      * @param array $data
      * @return void
      */
-    public function __construct($data, $service)
+    public function __construct($service)
     {
         $this->service = $service;
-        $this->data = $data;
     }
 
     /**
@@ -35,11 +34,6 @@ class StoreJob implements ShouldQueue, ShouldBeUnique
      */
     public function handle()
     {
-        $this->service->create($this->data);
+        $this->service->create();
     }
-
-    // public function failed(\Exception $e)
-    // {
-    //     \Illuminate\Support\Facades\Log::debug('MyNotification failed');
-    // }
 }
